@@ -1,98 +1,320 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
-
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+import { initDatabase } from "@/db/database";
+import { getAllParties } from "@/db/queries";
+import { useRefresh } from "@/hooks/use-refresh";
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+import React, { useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 export default function HomeScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+  const [parties, setParties] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [joueursCount, setJoueursCount] = useState(0);
+  const router = useRouter();
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+  async function loadData() {
+    try {
+      if (loading) {
+        await initDatabase();
+      }
+      const data = await getAllParties();
+      setParties(data);
+
+      // Charger le nombre de joueurs
+      const { getAllJoueurs } = await import("@/db/queries");
+      const joueurs = await getAllJoueurs();
+      setJoueursCount(joueurs.length);
+    } catch (error) {
+      console.error("Erreur:", error);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const { refreshing, onRefresh } = useRefresh(loadData);
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString("fr-FR", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color="#8B5CF6" />
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.headerTitle}>Cave Ray</Text>
+          <Text style={styles.headerSubtitle}>Gestion de parties de poker</Text>
+        </View>
+        <TouchableOpacity
+          style={styles.addButton}
+          onPress={() => router.push("/modal")}
+        >
+          <Ionicons name="add" size={24} color="white" />
+        </TouchableOpacity>
+      </View>
+
+      {/* Stats Cards */}
+      <View style={styles.statsContainer}>
+        <View style={[styles.statCard, { backgroundColor: "#8B5CF6" }]}>
+          <Ionicons name="game-controller" size={24} color="white" />
+          <Text style={styles.statNumber}>{parties.length}</Text>
+          <Text style={styles.statLabel}>Parties</Text>
+        </View>
+        <View style={[styles.statCard, { backgroundColor: "#EC4899" }]}>
+          <Ionicons name="people" size={24} color="white" />
+          <Text style={styles.statNumber}>{joueursCount}</Text>
+          <Text style={styles.statLabel}>Joueurs</Text>
+        </View>
+      </View>
+
+      {/* Parties List */}
+      <ScrollView
+        style={styles.partiesContainer}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#8B5CF6"
+            colors={["#8B5CF6"]}
+          />
+        }
+      >
+        <Text style={styles.sectionTitle}>Parties récentes</Text>
+        {parties.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Ionicons name="calendar-outline" size={64} color="#D1D5DB" />
+            <Text style={styles.emptyStateText}>Aucune partie enregistrée</Text>
+            <Text style={styles.emptyStateSubtext}>
+              Commencez par créer une nouvelle partie
+            </Text>
+          </View>
+        ) : (
+          parties.map((partie) => (
+            <TouchableOpacity key={partie.id_partie} style={styles.partieCard}>
+              <View style={styles.partieHeader}>
+                <View style={styles.partieIconContainer}>
+                  <Ionicons name="trophy" size={24} color="#8B5CF6" />
+                </View>
+                <View style={styles.partieInfo}>
+                  <Text style={styles.partieType}>
+                    {partie.type_partie === "cash_game"
+                      ? "Cash Game"
+                      : "Tournoi"}
+                  </Text>
+                  <Text style={styles.partieDate}>
+                    {formatDate(partie.date_partie)}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+              </View>
+              <View style={styles.partieDivider} />
+              <View style={styles.partieFooter}>
+                <View style={styles.partieDetail}>
+                  <Text style={styles.partieDetailLabel}>Big Blind</Text>
+                  <Text style={styles.partieDetailValue}>
+                    {partie.big_blind} €
+                  </Text>
+                </View>
+                {partie.max_recave && (
+                  <View style={styles.partieDetail}>
+                    <Text style={styles.partieDetailLabel}>Max Recave</Text>
+                    <Text style={styles.partieDetailValue}>
+                      {partie.max_recave}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </TouchableOpacity>
+          ))
+        )}
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  container: {
+    flex: 1,
+    backgroundColor: "#F9FAFB",
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  centerContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#F9FAFB",
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  header: {
+    backgroundColor: "white",
+    paddingTop: 60,
+    paddingBottom: 20,
+    paddingHorizontal: 20,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E7EB",
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: "bold",
+    color: "#111827",
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: "#6B7280",
+    marginTop: 2,
+  },
+  addButton: {
+    backgroundColor: "#8B5CF6",
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#8B5CF6",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  statsContainer: {
+    flexDirection: "row",
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    gap: 12,
+  },
+  statCard: {
+    flex: 1,
+    padding: 20,
+    borderRadius: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  statNumber: {
+    fontSize: 32,
+    fontWeight: "bold",
+    color: "white",
+    marginTop: 8,
+  },
+  statLabel: {
+    fontSize: 14,
+    color: "rgba(255, 255, 255, 0.9)",
+    marginTop: 4,
+  },
+  partiesContainer: {
+    flex: 1,
+    paddingHorizontal: 20,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: "600",
+    color: "#111827",
+    marginTop: 24,
+    marginBottom: 16,
+  },
+  partieCard: {
+    backgroundColor: "white",
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  partieHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  partieIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: "#F3E8FF",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
+  },
+  partieInfo: {
+    flex: 1,
+  },
+  partieType: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#111827",
+  },
+  partieDate: {
+    fontSize: 14,
+    color: "#6B7280",
+    marginTop: 2,
+  },
+  partieDivider: {
+    height: 1,
+    backgroundColor: "#E5E7EB",
+    marginVertical: 12,
+  },
+  partieFooter: {
+    flexDirection: "row",
+    gap: 24,
+  },
+  partieDetail: {
+    flex: 1,
+  },
+  partieDetailLabel: {
+    fontSize: 12,
+    color: "#6B7280",
+    marginBottom: 4,
+  },
+  partieDetailValue: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#111827",
+  },
+  emptyState: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 60,
+  },
+  emptyStateText: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#6B7280",
+    marginTop: 16,
+  },
+  emptyStateSubtext: {
+    fontSize: 14,
+    color: "#9CA3AF",
+    marginTop: 8,
+    textAlign: "center",
   },
 });
