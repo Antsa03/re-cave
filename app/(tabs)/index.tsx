@@ -1,11 +1,14 @@
+import CurrencySelector from "@/components/CurrencySelector";
+import { useCurrency } from "@/contexts/CurrencyContext";
 import { initDatabase } from "@/db/database";
-import { getAllParties } from "@/db/queries";
+import { deletePartie, getAllParties } from "@/db/queries";
 import { useRefresh } from "@/hooks/use-refresh";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -18,7 +21,9 @@ export default function HomeScreen() {
   const [parties, setParties] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [joueursCount, setJoueursCount] = useState(0);
+  const [currencySelectorVisible, setCurrencySelectorVisible] = useState(false);
   const router = useRouter();
+  const { currency, formatCurrency } = useCurrency();
 
   async function loadData() {
     try {
@@ -54,6 +59,29 @@ export default function HomeScreen() {
     });
   };
 
+  async function handleDeletePartie(id: number, type: string) {
+    Alert.alert(
+      "Confirmer la suppression",
+      `Êtes-vous sûr de vouloir supprimer cette partie ${type === "cash_game" ? "Cash Game" : "Tournoi"} ?`,
+      [
+        { text: "Annuler", style: "cancel" },
+        {
+          text: "Supprimer",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await deletePartie(id);
+              await loadData();
+              Alert.alert("Succès", "Partie supprimée avec succès");
+            } catch (error) {
+              Alert.alert("Erreur", "Impossible de supprimer la partie");
+            }
+          },
+        },
+      ]
+    );
+  }
+
   if (loading) {
     return (
       <View style={styles.centerContainer}>
@@ -66,17 +94,32 @@ export default function HomeScreen() {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <View>
-          <Text style={styles.headerTitle}>Cave Ray</Text>
+        <View style={styles.headerLeft}>
+          <Text style={styles.headerTitle}>Re Cave</Text>
           <Text style={styles.headerSubtitle}>Gestion de parties de poker</Text>
         </View>
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={() => router.push("/modal")}
-        >
-          <Ionicons name="add" size={24} color="white" />
-        </TouchableOpacity>
+        <View style={styles.headerRight}>
+          <TouchableOpacity
+            style={styles.currencyButton}
+            onPress={() => setCurrencySelectorVisible(true)}
+          >
+            <Text style={styles.currencyButtonText}>{currency.symbol}</Text>
+            <Text style={styles.currencyCodeText}>{currency.code}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.addButton}
+            onPress={() => router.push("/modal")}
+          >
+            <Ionicons name="add" size={24} color="white" />
+          </TouchableOpacity>
+        </View>
       </View>
+
+      {/* Currency Selector Modal */}
+      <CurrencySelector
+        visible={currencySelectorVisible}
+        onClose={() => setCurrencySelectorVisible(false)}
+      />
 
       {/* Stats Cards */}
       <View style={styles.statsContainer}>
@@ -97,60 +140,77 @@ export default function HomeScreen() {
         style={styles.partiesContainer}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor="#8B5CF6"
-            colors={["#8B5CF6"]}
-          />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
         <Text style={styles.sectionTitle}>Parties récentes</Text>
+
         {parties.length === 0 ? (
           <View style={styles.emptyState}>
-            <Ionicons name="calendar-outline" size={64} color="#D1D5DB" />
-            <Text style={styles.emptyStateText}>Aucune partie enregistrée</Text>
+            <Ionicons name="game-controller-outline" size={64} color="#D1D5DB" />
+            <Text style={styles.emptyStateText}>Aucune partie</Text>
             <Text style={styles.emptyStateSubtext}>
-              Commencez par créer une nouvelle partie
+              Créez votre première partie pour commencer
             </Text>
+            <TouchableOpacity
+              style={styles.createFirstButton}
+              onPress={() => router.push("/modal")}
+            >
+              <Text style={styles.createFirstButtonText}>Créer une partie</Text>
+            </TouchableOpacity>
           </View>
         ) : (
           parties.map((partie) => (
-            <TouchableOpacity key={partie.id_partie} style={styles.partieCard}>
-              <View style={styles.partieHeader}>
-                <View style={styles.partieIconContainer}>
-                  <Ionicons name="trophy" size={24} color="#8B5CF6" />
-                </View>
-                <View style={styles.partieInfo}>
-                  <Text style={styles.partieType}>
-                    {partie.type_partie === "cash_game"
-                      ? "Cash Game"
-                      : "Tournoi"}
-                  </Text>
-                  <Text style={styles.partieDate}>
-                    {formatDate(partie.date_partie)}
-                  </Text>
-                </View>
-                <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
-              </View>
-              <View style={styles.partieDivider} />
-              <View style={styles.partieFooter}>
-                <View style={styles.partieDetail}>
-                  <Text style={styles.partieDetailLabel}>Big Blind</Text>
-                  <Text style={styles.partieDetailValue}>
-                    {partie.big_blind} €
-                  </Text>
-                </View>
-                {partie.max_recave && (
-                  <View style={styles.partieDetail}>
-                    <Text style={styles.partieDetailLabel}>Max Recave</Text>
-                    <Text style={styles.partieDetailValue}>
-                      {partie.max_recave}
+            <View key={partie.id_partie} style={styles.partieCard}>
+              <TouchableOpacity 
+                style={styles.partieCardContent}
+                onPress={() => router.push(`/partie/${partie.id_partie}`)}
+              >
+                <View style={styles.partieHeader}>
+                  <View style={styles.partieIconContainer}>
+                    <Ionicons 
+                      name={partie.type_partie === "cash_game" ? "cash" : "trophy"} 
+                      size={24} 
+                      color="#8B5CF6" 
+                    />
+                  </View>
+                  <View style={styles.partieInfo}>
+                    <Text style={styles.partieType}>
+                      {partie.type_partie === "cash_game"
+                        ? "Cash Game"
+                        : "Tournoi"}
+                    </Text>
+                    <Text style={styles.partieDate}>
+                      {formatDate(partie.date_partie)}
                     </Text>
                   </View>
-                )}
-              </View>
-            </TouchableOpacity>
+                  <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+                </View>
+                <View style={styles.partieDivider} />
+                <View style={styles.partieFooter}>
+                  <View style={styles.partieDetail}>
+                    <Text style={styles.partieDetailLabel}>Big Blind</Text>
+                    <Text style={styles.partieDetailValue}>
+                      {formatCurrency(partie.big_blind)}
+                    </Text>
+                  </View>
+                  {partie.max_recave && (
+                    <View style={styles.partieDetail}>
+                      <Text style={styles.partieDetailLabel}>Max Recaves</Text>
+                      <Text style={styles.partieDetailValue}>
+                        {partie.max_recave}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.deletePartieButton}
+                onPress={() => handleDeletePartie(partie.id_partie, partie.type_partie)}
+              >
+                <Ionicons name="trash-outline" size={18} color="#EF4444" />
+              </TouchableOpacity>
+            </View>
           ))
         )}
       </ScrollView>
@@ -179,6 +239,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderBottomWidth: 1,
     borderBottomColor: "#E5E7EB",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  headerLeft: {
+    flex: 1,
   },
   headerTitle: {
     fontSize: 28,
@@ -187,6 +255,32 @@ const styles = StyleSheet.create({
   },
   headerSubtitle: {
     fontSize: 14,
+    color: "#6B7280",
+    marginTop: 2,
+  },
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  currencyButton: {
+    backgroundColor: "#F3F4F6",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  currencyButtonText: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#8B5CF6",
+  },
+  currencyCodeText: {
+    fontSize: 10,
+    fontWeight: "600",
     color: "#6B7280",
     marginTop: 2,
   },
@@ -206,28 +300,30 @@ const styles = StyleSheet.create({
   statsContainer: {
     flexDirection: "row",
     paddingHorizontal: 20,
-    paddingTop: 20,
-    gap: 12,
+    paddingVertical: 20,
+    gap: 16,
   },
   statCard: {
     flex: 1,
-    padding: 20,
     borderRadius: 16,
+    padding: 20,
+    alignItems: "center",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 8,
+    shadowRadius: 6,
     elevation: 3,
   },
   statNumber: {
-    fontSize: 32,
+    fontSize: 24,
     fontWeight: "bold",
     color: "white",
     marginTop: 8,
   },
   statLabel: {
     fontSize: 14,
-    color: "rgba(255, 255, 255, 0.9)",
+    color: "white",
+    opacity: 0.9,
     marginTop: 4,
   },
   partiesContainer: {
@@ -236,21 +332,30 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 20,
-    fontWeight: "600",
+    fontWeight: "700",
     color: "#111827",
-    marginTop: 24,
     marginBottom: 16,
   },
   partieCard: {
     backgroundColor: "white",
     borderRadius: 16,
-    padding: 16,
     marginBottom: 12,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 2,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  partieCardContent: {
+    flex: 1,
+    padding: 16,
+  },
+  deletePartieButton: {
+    padding: 16,
+    justifyContent: "center",
+    alignItems: "center",
   },
   partieHeader: {
     flexDirection: "row",
@@ -288,17 +393,19 @@ const styles = StyleSheet.create({
     gap: 24,
   },
   partieDetail: {
-    flex: 1,
+    alignItems: "center",
   },
   partieDetailLabel: {
     fontSize: 12,
-    color: "#6B7280",
-    marginBottom: 4,
+    color: "#9CA3AF",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
   },
   partieDetailValue: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "600",
     color: "#111827",
+    marginTop: 4,
   },
   emptyState: {
     alignItems: "center",
@@ -316,5 +423,17 @@ const styles = StyleSheet.create({
     color: "#9CA3AF",
     marginTop: 8,
     textAlign: "center",
+  },
+  createFirstButton: {
+    backgroundColor: "#8B5CF6",
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginTop: 20,
+  },
+  createFirstButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });

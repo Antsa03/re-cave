@@ -1,15 +1,17 @@
-import { createJoueur, deleteJoueur, getAllJoueurs } from "@/db/queries";
+import { createJoueur, deleteJoueur, getAllJoueurs, updateJoueur } from "@/db/queries";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useState } from "react";
 import {
-  Alert,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    Alert,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 
 export default function JoueursScreen() {
@@ -18,6 +20,7 @@ export default function JoueursScreen() {
   const [pseudo, setPseudo] = useState("");
   const [contact, setContact] = useState("");
   const [loading, setLoading] = useState(false);
+  const [editingJoueur, setEditingJoueur] = useState<any | null>(null);
 
   useEffect(() => {
     loadJoueurs();
@@ -40,18 +43,41 @@ export default function JoueursScreen() {
 
     setLoading(true);
     try {
-      await createJoueur(pseudo.trim(), contact.trim() || undefined);
+      if (editingJoueur) {
+        await updateJoueur(editingJoueur.id_joueur, {
+          pseudo: pseudo.trim(),
+          contact: contact.trim() || undefined
+        });
+        Alert.alert("Succès", "Joueur modifié avec succès");
+      } else {
+        await createJoueur(pseudo.trim(), contact.trim() || undefined);
+        Alert.alert("Succès", "Joueur créé avec succès");
+      }
       setPseudo("");
       setContact("");
+      setEditingJoueur(null);
       setModalVisible(false);
       await loadJoueurs();
-      Alert.alert("Succès", "Joueur créé avec succès");
     } catch (error) {
-      Alert.alert("Erreur", "Impossible de créer le joueur");
+      Alert.alert("Erreur", editingJoueur ? "Impossible de modifier le joueur" : "Impossible de créer le joueur");
       console.error(error);
     } finally {
       setLoading(false);
     }
+  }
+
+  function handleOpenEditModal(joueur: any) {
+    setEditingJoueur(joueur);
+    setPseudo(joueur.pseudo);
+    setContact(joueur.contact || "");
+    setModalVisible(true);
+  }
+
+  function handleCloseModal() {
+    setModalVisible(false);
+    setPseudo("");
+    setContact("");
+    setEditingJoueur(null);
   }
 
   async function handleDeleteJoueur(id: number, pseudo: string) {
@@ -67,6 +93,7 @@ export default function JoueursScreen() {
             try {
               await deleteJoueur(id);
               await loadJoueurs();
+              Alert.alert("Succès", "Joueur supprimé avec succès");
             } catch (error) {
               Alert.alert("Erreur", "Impossible de supprimer le joueur");
             }
@@ -119,31 +146,44 @@ export default function JoueursScreen() {
                   <Text style={styles.joueurContact}>{joueur.contact}</Text>
                 )}
               </View>
-              <TouchableOpacity
-                style={styles.deleteButton}
-                onPress={() =>
-                  handleDeleteJoueur(joueur.id_joueur, joueur.pseudo)
-                }
-              >
-                <Ionicons name="trash-outline" size={20} color="#EF4444" />
-              </TouchableOpacity>
+              <View style={styles.actionsContainer}>
+                <TouchableOpacity
+                  style={styles.editButton}
+                  onPress={() => handleOpenEditModal(joueur)}
+                >
+                  <Ionicons name="create-outline" size={20} color="#8B5CF6" />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.deleteButton}
+                  onPress={() =>
+                    handleDeleteJoueur(joueur.id_joueur, joueur.pseudo)
+                  }
+                >
+                  <Ionicons name="trash-outline" size={20} color="#EF4444" />
+                </TouchableOpacity>
+              </View>
             </View>
           ))
         )}
       </ScrollView>
 
-      {/* Modal Création Joueur */}
+      {/* Modal Création Joueur avec KeyboardAvoidingView */}
       <Modal
         animationType="slide"
         transparent={true}
         visible={modalVisible}
         onRequestClose={() => setModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView 
+          style={styles.modalOverlay} 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Nouveau joueur</Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)}>
+              <Text style={styles.modalTitle}>
+                {editingJoueur ? "Modifier le joueur" : "Nouveau joueur"}
+              </Text>
+              <TouchableOpacity onPress={handleCloseModal}>
                 <Ionicons name="close" size={24} color="#6B7280" />
               </TouchableOpacity>
             </View>
@@ -156,6 +196,7 @@ export default function JoueursScreen() {
                 onChangeText={setPseudo}
                 placeholder="Entrez le pseudo"
                 placeholderTextColor="#9CA3AF"
+                returnKeyType="next"
               />
             </View>
 
@@ -167,6 +208,7 @@ export default function JoueursScreen() {
                 onChangeText={setContact}
                 placeholder="Email ou téléphone"
                 placeholderTextColor="#9CA3AF"
+                returnKeyType="done"
               />
             </View>
 
@@ -179,11 +221,11 @@ export default function JoueursScreen() {
               disabled={loading}
             >
               <Text style={styles.submitButtonText}>
-                {loading ? "Création..." : "Créer le joueur"}
+                {loading ? (editingJoueur ? "Modification..." : "Création...") : (editingJoueur ? "Modifier" : "Créer le joueur")}
               </Text>
             </TouchableOpacity>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -267,6 +309,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#6B7280",
     marginTop: 2,
+  },
+  actionsContainer: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  editButton: {
+    padding: 8,
   },
   deleteButton: {
     padding: 8,

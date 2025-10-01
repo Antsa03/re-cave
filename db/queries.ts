@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { db } from "./database";
 import * as schema from "./schema";
 
@@ -84,6 +84,14 @@ export async function getCaveById(id: number) {
   return await db.select().from(schema.cave).where(eq(schema.cave.id_cave, id));
 }
 
+export async function updateCave(id: number, data: { montant?: number; heure_cave?: string }) {
+  return await db.update(schema.cave).set(data).where(eq(schema.cave.id_cave, id));
+}
+
+export async function deleteCave(id: number) {
+  return await db.delete(schema.cave).where(eq(schema.cave.id_cave, id));
+}
+
 // ===== RESULTAT QUERIES =====
 export async function createResultat(
   montant_restant: number,
@@ -145,4 +153,85 @@ export async function appartenirResultat(
   id_partie: number
 ) {
   return await db.insert(schema.appartenir).values({ id_resultat, id_partie });
+}
+
+// ===== QUERIES AVANCÉES POUR LA GESTION DES PARTIES =====
+
+// Récupérer les caves d'un joueur dans une partie spécifique
+export async function getCavesJoueurPartie(id_joueur: number, id_partie: number) {
+  return await db
+    .select({
+      cave: schema.cave,
+    })
+    .from(schema.acheter)
+    .innerJoin(schema.cave, eq(schema.acheter.id_cave, schema.cave.id_cave))
+    .innerJoin(schema.contenir, eq(schema.cave.id_cave, schema.contenir.id_cave))
+    .where(
+      and(
+        eq(schema.acheter.id_joueur, id_joueur),
+        eq(schema.contenir.id_partie, id_partie)
+      )
+    );
+}
+
+// Récupérer le résultat d'un joueur dans une partie
+export async function getResultatJoueurPartie(id_joueur: number, id_partie: number) {
+  return await db
+    .select({
+      resultat: schema.resultat,
+    })
+    .from(schema.decaver)
+    .innerJoin(schema.resultat, eq(schema.decaver.id_resultat, schema.resultat.id_resultat))
+    .innerJoin(schema.appartenir, eq(schema.resultat.id_resultat, schema.appartenir.id_resultat))
+    .where(
+      and(
+        eq(schema.decaver.id_joueur, id_joueur),
+        eq(schema.appartenir.id_partie, id_partie)
+      )
+    );
+}
+
+// Supprimer un participant d'une partie
+export async function retirerParticipant(id_joueur: number, id_partie: number) {
+  return await db
+    .delete(schema.participer)
+    .where(
+      and(
+        eq(schema.participer.id_joueur, id_joueur),
+        eq(schema.participer.id_partie, id_partie)
+      )
+    );
+}
+
+// Récupérer les statistiques d'une partie
+export async function getStatistiquesPartie(id_partie: number) {
+  const participants = await getParticipantsPartie(id_partie);
+  
+  let totalCaves = 0;
+  let totalGains = 0;
+  let totalPertes = 0;
+  
+  for (const participant of participants) {
+    const caves = await getCavesJoueurPartie(participant.joueur.id_joueur, id_partie);
+    const resultat = await getResultatJoueurPartie(participant.joueur.id_joueur, id_partie);
+    
+    const totalCaveJoueur = caves.reduce((sum, c) => sum + c.cave.montant, 0);
+    totalCaves += totalCaveJoueur;
+    
+    if (resultat.length > 0) {
+      const gainPerte = resultat[0].resultat.gain_perte;
+      if (gainPerte >= 0) {
+        totalGains += gainPerte;
+      } else {
+        totalPertes += Math.abs(gainPerte);
+      }
+    }
+  }
+  
+  return {
+    nombreParticipants: participants.length,
+    totalCaves,
+    totalGains,
+    totalPertes,
+  };
 }
