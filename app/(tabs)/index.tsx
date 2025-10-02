@@ -79,7 +79,6 @@ export default function HomeScreen() {
             try {
               await deletePartie(id);
               await loadData();
-              Alert.alert("Succès", "Partie supprimée avec succès");
             } catch (error) {
               Alert.alert("Erreur", "Impossible de supprimer la partie");
             }
@@ -103,7 +102,7 @@ export default function HomeScreen() {
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <Text style={styles.headerTitle}>Re Cave</Text>
-          <Text style={styles.headerSubtitle}>Gestion de parties de poker</Text>
+          <Text style={styles.headerSubtitle}>Gestion de parties de poker par G++</Text>
         </View>
         <View style={styles.headerRight}>
           <TouchableOpacity

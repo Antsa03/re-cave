@@ -1,5 +1,5 @@
 import { useCurrency } from "@/contexts/CurrencyContext";
-import { getAllJoueurs, getAllParties, getStatistiquesPartie } from "@/db/queries";
+import { getAllJoueurs, getAllParties, getGlobalStats, getStatistiquesPartie } from "@/db/queries";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useState } from "react";
 import {
@@ -17,6 +17,7 @@ interface Stats {
   totalCaves: number;
   totalGains: number;
   totalPertes: number;
+  lastTableStack: number;
   partiesRecentes: any[];
 }
 
@@ -38,25 +39,18 @@ export default function StatistiquesScreen() {
       let totalCaves = 0;
       let totalGains = 0;
       let totalPertes = 0;
+      const globalStats = await getGlobalStats();
+      console.log("glob",globalStats);
       
       // Calculer les stats pour toutes les parties
-      for (const partie of parties.slice(0, 10)) { // Limiter pour éviter les performances
-        try {
-          const statsPartie = await getStatistiquesPartie(partie.id_partie);
-          totalCaves += statsPartie.totalCaves;
-          totalGains += statsPartie.totalGains;
-          totalPertes += statsPartie.totalPertes;
-        } catch (error) {
-          console.log(`Erreur stats partie ${partie.id_partie}:`, error);
-        }
-      }
       
       setStats({
         totalParties: parties.length,
         totalJoueurs: joueurs.length,
-        totalCaves,
-        totalGains,
-        totalPertes,
+        totalCaves: globalStats.totalCaves,
+        totalGains: globalStats.gainsMainson,
+        totalPertes: globalStats.totalRestant,
+        lastTableStack: globalStats.tableStackDernierePartie,
         partiesRecentes: parties.slice(0, 5),
       });
     } catch (error) {
@@ -146,13 +140,13 @@ export default function StatistiquesScreen() {
             <View style={[styles.financialCard, { backgroundColor: "#10B981" }]}>
               <Ionicons name="trending-up" size={24} color="white" />
               <Text style={styles.financialAmount}>{formatCurrency(stats.totalGains)}</Text>
-              <Text style={styles.financialLabel}>Gains totaux</Text>
+              <Text style={styles.financialLabel}>Gains de la maison</Text>
             </View>
             
             <View style={[styles.financialCard, { backgroundColor: "#EF4444" }]}>
               <Ionicons name="trending-down" size={24} color="white" />
               <Text style={styles.financialAmount}>{formatCurrency(stats.totalPertes)}</Text>
-              <Text style={styles.financialLabel}>Pertes totales</Text>
+              <Text style={styles.financialLabel}>Argent payé</Text>
             </View>
             
             <View style={[styles.financialCard, { backgroundColor: "#6366F1" }]}>
@@ -161,9 +155,9 @@ export default function StatistiquesScreen() {
                 styles.financialAmount,
                 { color: stats.totalGains - stats.totalPertes >= 0 ? "white" : "white" }
               ]}>
-                {formatCurrency(stats.totalGains - stats.totalPertes)}
+                {formatCurrency(stats.lastTableStack)}
               </Text>
-              <Text style={styles.financialLabel}>Bilan net</Text>
+              <Text style={styles.financialLabel}>Last Table stack</Text>
             </View>
           </View>
         </View>

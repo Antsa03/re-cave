@@ -37,7 +37,6 @@ export default function JoueursScreen() {
 
   async function handleCreateJoueur() {
     if (!pseudo.trim()) {
-      Alert.alert("Erreur", "Le pseudo est requis");
       return;
     }
 
@@ -48,10 +47,8 @@ export default function JoueursScreen() {
           pseudo: pseudo.trim(),
           contact: contact.trim() || undefined
         });
-        Alert.alert("Succès", "Joueur modifié avec succès");
       } else {
         await createJoueur(pseudo.trim(), contact.trim() || undefined);
-        Alert.alert("Succès", "Joueur créé avec succès");
       }
       setPseudo("");
       setContact("");
@@ -93,7 +90,6 @@ export default function JoueursScreen() {
             try {
               await deleteJoueur(id);
               await loadJoueurs();
-              Alert.alert("Succès", "Joueur supprimé avec succès");
             } catch (error) {
               Alert.alert("Erreur", "Impossible de supprimer le joueur");
             }

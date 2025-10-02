@@ -1,6 +1,7 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql, sum } from "drizzle-orm";
 import { db } from "./database";
 import * as schema from "./schema";
+import { appartenir, cave, contenir, partie, resultat } from "./schema";
 
 // ===== JOUEUR QUERIES =====
 export async function createJoueur(pseudo: string, contact?: string) {
@@ -137,6 +138,32 @@ export async function getParticipantsPartie(id_partie: number) {
     .where(eq(schema.participer.id_partie, id_partie));
 }
 
+
+export async function getTableStack(id_partie: number) {
+  // Total des caves pour cette partie
+  const cavesResult = await db
+    .select({
+      totalCaves: sql<number>`CAST(COALESCE(SUM(${cave.montant}), 0) AS REAL)`,
+    })
+    .from(cave)
+    .innerJoin(contenir, eq(cave.id_cave, contenir.id_cave))
+    .where(eq(contenir.id_partie, id_partie));
+
+  // Total des montants restants pour cette partie
+  const resultatsResult = await db
+    .select({
+      totalRestant: sql<number>`CAST(COALESCE(SUM(${resultat.montant_restant}), 0) AS REAL)`,
+    })
+    .from(resultat)
+    .innerJoin(appartenir, eq(resultat.id_resultat, appartenir.id_resultat))
+    .where(eq(appartenir.id_partie, id_partie));
+
+  const totalCaves = Number(cavesResult[0]?.totalCaves ?? 0);
+  const totalRestant = Number(resultatsResult[0]?.totalRestant ?? 0);
+
+  return totalCaves - totalRestant;
+}
+
 // ===== CONTENIR (CAVE -> PARTIE) =====
 export async function contenirCave(id_cave: number, id_partie: number) {
   return await db.insert(schema.contenir).values({ id_cave, id_partie });
@@ -206,6 +233,7 @@ export async function retirerParticipant(id_joueur: number, id_partie: number) {
 // Récupérer les statistiques d'une partie
 export async function getStatistiquesPartie(id_partie: number) {
   const participants = await getParticipantsPartie(id_partie);
+  const tableStack = getTableStack(id_partie)
   
   let totalCaves = 0;
   let totalGains = 0;
@@ -230,8 +258,69 @@ export async function getStatistiquesPartie(id_partie: number) {
   
   return {
     nombreParticipants: participants.length,
+    tableStack,
     totalCaves,
     totalGains,
     totalPertes,
   };
+}
+export async function getGlobalStats() {
+  // 1. Total de tous les montants de caves
+  const totalCavesResult = await db
+    .select({
+      total: sql<number>`CAST(COALESCE(SUM(${cave.montant}), 0) AS REAL)`,
+    })
+    .from(cave);
+
+  // 2. Total de tous les montants restants
+  const totalRestantResult = await db
+    .select({
+      total: sql<number>`CAST(COALESCE(SUM(${resultat.montant_restant}), 0) AS REAL)`,
+    })
+    .from(resultat);
+
+  // 3. Dernière partie
+  const dernierePartieResult = await db
+    .select({
+      id_partie: partie.id_partie,
+    })
+    .from(partie)
+    .orderBy(desc(partie.id_partie))
+    .limit(1);
+
+  const totalCaves = Number(totalCavesResult[0]?.total ?? 0);
+  const totalRestant = Number(totalRestantResult[0]?.total ?? 0);
+  const gainsMainson = totalCaves - totalRestant;
+
+  // 4. Table stack de la dernière partie
+  let tableStackDernierePartie = 0;
+  if (dernierePartieResult.length > 0) {
+    const idDernierePartie = dernierePartieResult[0].id_partie;
+    const result  = await db
+    .select({
+      totalStack: sql<number>`CAST(COALESCE(SUM(${cave.montant}), 0) AS REAL)`,
+    })
+    .from(cave)
+    .innerJoin(contenir, eq(cave.id_cave, contenir.id_cave))
+    .where(eq(contenir.id_partie, idDernierePartie));
+    tableStackDernierePartie = Number(result[0]?.totalStack ?? 0);
+  }
+  
+  return {
+    gainsMainson, // Jetons non décavés (gains de la maison)
+    totalCaves, // Total de toutes les caves
+    totalRestant, // Total de tous les montants restants
+    tableStackDernierePartie, // Table stack de la dernière partie
+  };
+}
+export async function getTotatlRecave(id_partie: number) {
+  const result = await db
+    .select({
+      totalStack: sql<number>`CAST(COALESCE(SUM(${cave.montant}), 0) AS REAL)`,
+    })
+    .from(cave)
+    .innerJoin(contenir, eq(cave.id_cave, contenir.id_cave))
+    .where(eq(contenir.id_partie, id_partie));
+  
+  return Number(result[0]?.totalStack ?? 0);
 }

@@ -12,6 +12,8 @@ import {
     getParticipantsPartie,
     getPartieById,
     getResultatJoueurPartie,
+    getTableStack,
+    getTotatlRecave,
     participerPartie,
     retirerParticipant,
     updateCave
@@ -70,6 +72,8 @@ export default function PartieDetailScreen() {
   const [partie, setPartie] = useState<Partie | null>(null);
   const [participants, setParticipants] = useState<ParticipantData[]>([]);
   const [allJoueurs, setAllJoueurs] = useState<Joueur[]>([]);
+  const [tableStackt, setTableStack] = useState(0);
+  const [totalRecave, setTotalRecave] = useState(0);
   const [loading, setLoading] = useState(true);
   
   // Modals
@@ -86,13 +90,26 @@ export default function PartieDetailScreen() {
   const [montantRestant, setMontantRestant] = useState("");
   
   // Montants prédéfinis
-  const predefinedAmounts = [20, 50, 100, 200, 500];
+  const predefinedAmounts = [10, 100, 1000, 10000, 20, 200, 2000, 20000, 50, 500, 5000, 50000];
 
   useEffect(() => {
     if (id) {
       loadPartieDetails();
     }
   }, [id]);
+  const handleChangeMontant = (text: string) => {
+    // Convertir la saisie en nombre
+    const valeur = parseFloat(text);
+  
+    // Vérifie si c'est un nombre valide et inférieur à une limite
+    if (!isNaN(valeur) && valeur <= tableStackt) {
+      setMontantRestant(text);
+      
+    } else if (text === "") {
+      setMontantRestant(""); 
+    } else {
+    }
+  };
 
   async function loadPartieDetails() {
     try {
@@ -136,6 +153,11 @@ export default function PartieDetailScreen() {
       // Charger tous les joueurs pour la sélection
       const joueursData = await getAllJoueurs();
       setAllJoueurs(joueursData);
+
+      const tableStackResponse = await getTableStack(parseInt(id!));
+      setTableStack(tableStackResponse);
+      const totalRecaveResponse = await getTotatlRecave(parseInt(id!));
+      setTotalRecave(totalRecaveResponse);
       
     } catch (error) {
       console.error("Erreur:", error);
@@ -151,8 +173,7 @@ export default function PartieDetailScreen() {
     try {
       const heure = new Date().toISOString();
       await participerPartie(selectedPlayer, parseInt(id!), heure);
-      
-      Alert.alert("Succès", "Joueur ajouté à la partie");
+
       setAddPlayerModal(false);
       setSelectedPlayer(null);
       await loadPartieDetails();
@@ -182,8 +203,6 @@ export default function PartieDetailScreen() {
       
       // Associer la cave à la partie
       await contenirCave(caveId, parseInt(id!));
-      
-      Alert.alert("Succès", "Cave ajoutée avec succès");
       setAddCaveModal(false);
       setSelectedParticipant(null);
       setCaveMontant("");
@@ -215,8 +234,6 @@ export default function PartieDetailScreen() {
       
       // Associer le résultat à la partie
       await appartenirResultat(resultatId, parseInt(id!));
-      
-      Alert.alert("Succès", "Résultat enregistré avec succès");
       setFinishGameModal(false);
       setSelectedParticipant(null);
       setMontantRestant("");
@@ -247,7 +264,6 @@ export default function PartieDetailScreen() {
           onPress: async () => {
             try {
               await retirerParticipant(participant.joueur.id_joueur, parseInt(id!));
-              Alert.alert("Succès", "Joueur retiré de la partie");
               await loadPartieDetails();
             } catch (error) {
               Alert.alert("Erreur", "Impossible de retirer le joueur");
@@ -270,7 +286,6 @@ export default function PartieDetailScreen() {
           onPress: async () => {
             try {
               await deleteCave(caveId);
-              Alert.alert("Succès", "Cave supprimée avec succès");
               await loadPartieDetails();
             } catch (error) {
               Alert.alert("Erreur", "Impossible de supprimer la cave");
@@ -306,7 +321,6 @@ export default function PartieDetailScreen() {
 
     try {
       await updateCave(selectedCave.id_cave, { montant });
-      Alert.alert("Succès", "Cave modifiée avec succès");
       handleCloseEditCaveModal();
       await loadPartieDetails();
     } catch (error) {
@@ -393,6 +407,14 @@ export default function PartieDetailScreen() {
         <View style={styles.infoRow}>
           <Text style={styles.infoLabel}>Participants:</Text>
           <Text style={styles.infoValue}>{participants.length}</Text>
+        </View>
+        <View style={styles.infoRow}>
+          <Text style={styles.infoLabel}>Total recave</Text>
+          <Text style={styles.infoValue}>{totalRecave}</Text>
+        </View>
+        <View style={styles.infoRow}>
+          <Text style={styles.infoLabel}>Table stakes</Text>
+          <Text style={styles.infoValue}>{tableStackt}</Text>
         </View>
       </View>
 
@@ -576,7 +598,7 @@ export default function PartieDetailScreen() {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
-                Ajouter une cave - {selectedParticipant?.joueur.pseudo}
+                Recave de {selectedParticipant?.joueur.pseudo}
               </Text>
               <TouchableOpacity onPress={() => setAddCaveModal(false)}>
                 <Ionicons name="close" size={24} color="#6B7280" />
@@ -599,7 +621,7 @@ export default function PartieDetailScreen() {
                       styles.predefinedAmountText,
                       caveMontant === amount.toString() && styles.predefinedAmountTextSelected
                     ]}>
-                      {amount}€
+                      {amount}
                     </Text>
                   </TouchableOpacity>
                 ))}
@@ -673,7 +695,7 @@ export default function PartieDetailScreen() {
                       styles.predefinedAmountText,
                       caveMontant === amount.toString() && styles.predefinedAmountTextSelected
                     ]}>
-                      {amount}€
+                      {amount}
                     </Text>
                   </TouchableOpacity>
                 ))}
@@ -742,13 +764,13 @@ export default function PartieDetailScreen() {
             </View>
 
             <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Montant restant *</Text>
+              <Text style={styles.inputLabel}>Cash out *</Text>
               <View style={styles.inputWrapper}>
                 <Ionicons name="logo-euro" size={20} color="#6B7280" />
                 <TextInput
                   style={styles.input}
                   value={montantRestant}
-                  onChangeText={setMontantRestant}
+                  onChangeText={handleChangeMontant}
                   placeholder="Montant final"
                   placeholderTextColor="#9CA3AF"
                   keyboardType="decimal-pad"
