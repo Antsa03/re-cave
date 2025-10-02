@@ -42,12 +42,8 @@ export default function CreatePartieModal() {
 
       await createPartie(datePartie, bigBlindValue, typePartie, maxRecaveValue);
 
-      Alert.alert("Succès", "Partie créée avec succès", [
-        {
-          text: "OK",
-          onPress: () => router.back(),
-        },
-      ]);
+      // Revenir à la page d'accueil (qui se rafraîchira automatiquement)
+      router.back();
     } catch (error) {
       Alert.alert("Erreur", "Impossible de créer la partie");
       console.error(error);

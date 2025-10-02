@@ -4,8 +4,8 @@ import { initDatabase } from "@/db/database";
 import { deletePartie, getAllParties } from "@/db/queries";
 import { useRefresh } from "@/hooks/use-refresh";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -49,6 +49,13 @@ export default function HomeScreen() {
   useEffect(() => {
     loadData();
   }, []);
+
+  // Recharger les données chaque fois que l'écran devient actif
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [])
+  );
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
