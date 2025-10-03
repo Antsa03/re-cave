@@ -1,38 +1,38 @@
 import { useCurrency } from "@/contexts/CurrencyContext";
 import {
-    acheterCave,
-    appartenirResultat,
-    contenirCave,
-    createCave,
-    createResultat,
-    decaverJoueur,
-    deleteCave,
-    getAllJoueurs,
-    getCavesJoueurPartie,
-    getParticipantsPartie,
-    getPartieById,
-    getResultatJoueurPartie,
-    getTableStack,
-    getTotatlRecave,
-    participerPartie,
-    retirerParticipant,
-    updateCave
+  acheterCave,
+  appartenirResultat,
+  contenirCave,
+  createCave,
+  createResultat,
+  decaverJoueur,
+  deleteCave,
+  getAllJoueurs,
+  getCavesJoueurPartie,
+  getParticipantsPartie,
+  getPartieById,
+  getResultatJoueurPartie,
+  getTableStack,
+  getTotatlRecave,
+  participerPartie,
+  retirerParticipant,
+  updateCave
 } from "@/db/queries";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 interface Joueur {
@@ -45,8 +45,9 @@ interface ParticipantData {
   joueur: Joueur;
   heure: string | null;
   caves: Cave[];
+  decaves: Decave[];
   totalCave: number;
-  montantRestant: number;
+  totalDecave: number;
   isActive: boolean;
 }
 
@@ -54,6 +55,12 @@ interface Cave {
   id_cave: number;
   montant: number;
   heure_cave: string;
+}
+
+interface Decave {
+  id_resultat: number;
+  montant_restant: number;
+  gain_perte: number;
 }
 
 interface Partie {
@@ -80,14 +87,15 @@ export default function PartieDetailScreen() {
   const [addPlayerModal, setAddPlayerModal] = useState(false);
   const [addCaveModal, setAddCaveModal] = useState(false);
   const [editCaveModal, setEditCaveModal] = useState(false);
-  const [finishGameModal, setFinishGameModal] = useState(false);
+  const [decaveModal, setDecaveModal] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<number | null>(null);
   const [selectedParticipant, setSelectedParticipant] = useState<ParticipantData | null>(null);
   const [selectedCave, setSelectedCave] = useState<Cave | null>(null);
+  const [selectedDecave, setSelectedDecave] = useState<Decave | null>(null);
   
   // Form states
   const [caveMontant, setCaveMontant] = useState("");
-  const [montantRestant, setMontantRestant] = useState("");
+  const [cashOutMontant, setCashOutMontant] = useState("");
   
   // Montants prédéfinis
   const predefinedAmounts = [10, 100, 1000, 10000, 20, 200, 2000, 20000, 50, 500, 5000, 50000];
@@ -97,16 +105,16 @@ export default function PartieDetailScreen() {
       loadPartieDetails();
     }
   }, [id]);
-  const handleChangeMontant = (text: string) => {
+  const handleChangeCashOut = (text: string) => {
     // Convertir la saisie en nombre
     const valeur = parseFloat(text);
   
     // Vérifie si c'est un nombre valide et inférieur à une limite
     if (!isNaN(valeur) && valeur <= tableStackt) {
-      setMontantRestant(text);
+      setCashOutMontant(text);
       
     } else if (text === "") {
-      setMontantRestant(""); 
+      setCashOutMontant(""); 
     } else {
     }
   };
@@ -132,18 +140,23 @@ export default function PartieDetailScreen() {
           const caves: Cave[] = cavesData.map((c) => c.cave);
           const totalCave = caves.reduce((sum: number, cave: Cave) => sum + cave.montant, 0);
           
-          // Charger le résultat du joueur s'il existe
+          // Charger tous les résultats (décaves) du joueur
           const resultatData = await getResultatJoueurPartie(p.joueur.id_joueur, parseInt(id!));
-          const resultat = resultatData.length > 0 ? resultatData[0].resultat : null;
-          const montantRestant = resultat ? resultat.montant_restant : 0;
+          const decaves: Decave[] = resultatData.map((r: any) => ({
+            id_resultat: r.resultat.id_resultat,
+            montant_restant: r.resultat.montant_restant,
+            gain_perte: r.resultat.gain_perte
+          }));
+          const totalDecave = decaves.reduce((sum: number, d: Decave) => sum + d.montant_restant, 0);
           
           return {
             joueur: p.joueur,
             heure: p.heure,
             caves,
+            decaves,
             totalCave,
-            montantRestant,
-            isActive: resultat === null // Le joueur est actif s'il n'a pas encore de résultat
+            totalDecave,
+            isActive: true // Le joueur est toujours actif, on peut toujours décaver
           };
         })
       );
@@ -212,20 +225,25 @@ export default function PartieDetailScreen() {
     }
   }
 
-  async function handleFinishGame() {
-    if (!selectedParticipant || !montantRestant.trim()) return;
+  async function handleDecave() {
+    if (!selectedParticipant || !cashOutMontant.trim()) return;
     
-    const montant = parseFloat(montantRestant);
+    const montant = parseFloat(cashOutMontant);
     if (isNaN(montant) || montant < 0) {
-      Alert.alert("Erreur", "Le montant restant doit être un nombre positif ou zéro");
+      Alert.alert("Erreur", "Le montant du cash out doit être un nombre positif ou zéro");
+      return;
+    }
+    
+    // Vérifier que le montant ne dépasse pas le total des caves moins les décaves déjà effectués
+    const montantDisponible = selectedParticipant.totalCave - selectedParticipant.totalDecave;
+    if (montant > montantDisponible) {
+      Alert.alert("Erreur", `Le montant ne peut pas dépasser ${formatCurrency(montantDisponible)}`);
       return;
     }
     
     try {
-      // Calculer le gain/perte (montant restant - total des caves)
-      const gainPerte = montant - selectedParticipant.totalCave;
-      
-      // Créer le résultat
+      // Créer le résultat (décave)
+      const gainPerte = montant - selectedParticipant.totalCave + selectedParticipant.totalDecave;
       const resultat = await createResultat(montant, gainPerte);
       const resultatId = resultat[0].id_resultat;
       
@@ -234,12 +252,12 @@ export default function PartieDetailScreen() {
       
       // Associer le résultat à la partie
       await appartenirResultat(resultatId, parseInt(id!));
-      setFinishGameModal(false);
+      setDecaveModal(false);
       setSelectedParticipant(null);
-      setMontantRestant("");
+      setCashOutMontant("");
       await loadPartieDetails();
     } catch (error) {
-      Alert.alert("Erreur", "Impossible d'enregistrer le résultat");
+      Alert.alert("Erreur", "Impossible d'enregistrer le décave");
     }
   }
 
@@ -453,22 +471,20 @@ export default function PartieDetailScreen() {
                   >
                     <Ionicons name="add-circle" size={20} color="#8B5CF6" />
                   </TouchableOpacity>
-                  {participant.isActive && (
-                    <TouchableOpacity
-                      style={styles.actionButton}
-                      onPress={() => {
-                        setSelectedParticipant(participant);
-                        setFinishGameModal(true);
-                      }}
-                    >
-                      <Ionicons name="checkmark-circle" size={20} color="#10B981" />
-                    </TouchableOpacity>
-                  )}
+                  <TouchableOpacity
+                    style={styles.actionButton}
+                    onPress={() => {
+                      setSelectedParticipant(participant);
+                      setDecaveModal(true);
+                    }}
+                  >
+                    <Ionicons name="remove-circle-outline" size={20} color="#F59E0B" />
+                  </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.actionButton}
                     onPress={() => handleRemoveParticipant(participant)}
                   >
-                    <Ionicons name="remove-circle" size={20} color="#EF4444" />
+                    <Ionicons name="trash-outline" size={20} color="#EF4444" />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -479,16 +495,16 @@ export default function PartieDetailScreen() {
                   <Text style={styles.statValue}>{formatCurrency(participant.totalCave)}</Text>
                 </View>
                 <View style={styles.statItem}>
-                  <Text style={styles.statLabel}>Restant</Text>
-                  <Text style={styles.statValue}>{formatCurrency(participant.montantRestant)}</Text>
+                  <Text style={styles.statLabel}>Cash out</Text>
+                  <Text style={styles.statValue}>{formatCurrency(participant.totalDecave)}</Text>
                 </View>
                 <View style={styles.statItem}>
                   <Text style={styles.statLabel}>Gain/Perte</Text>
                   <Text style={[
                     styles.statValue,
-                    { color: participant.montantRestant - participant.totalCave >= 0 ? "#10B981" : "#EF4444" }
+                    { color: participant.totalDecave - participant.totalCave >= 0 ? "#10B981" : "#EF4444" }
                   ]}>
-                    {formatCurrency(participant.montantRestant - participant.totalCave)}
+                    {formatCurrency(participant.totalDecave - participant.totalCave)}
                   </Text>
                 </View>
               </View>
@@ -496,11 +512,11 @@ export default function PartieDetailScreen() {
               {/* Liste des caves */}
               {participant.caves.length > 0 && (
                 <View style={styles.cavesContainer}>
-                  <Text style={styles.cavesTitle}>Détail des caves ({participant.caves.length})</Text>
+                  <Text style={styles.cavesTitle}>Recaves ({participant.caves.length})</Text>
                   {participant.caves.map((cave, index) => (
                     <View key={cave.id_cave} style={styles.caveItem}>
                       <View style={styles.caveInfo}>
-                        <Text style={styles.caveNumber}>Cave #{index + 1}</Text>
+                        <Text style={styles.caveNumber}>Recave #{index + 1}</Text>
                         <Text style={styles.caveMontant}>{formatCurrency(cave.montant)}</Text>
                       </View>
                       <View style={styles.caveActions}>
@@ -520,6 +536,29 @@ export default function PartieDetailScreen() {
                         >
                           <Ionicons name="trash-outline" size={16} color="#EF4444" />
                         </TouchableOpacity>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              {/* Liste des cash outs */}
+              {participant.decaves.length > 0 && (
+                <View style={styles.cavesContainer}>
+                  <Text style={styles.cavesTitle}>Cash out ({participant.decaves.length})</Text>
+                  {participant.decaves.map((decave, index) => (
+                    <View key={decave.id_resultat} style={styles.caveItem}>
+                      <View style={styles.caveInfo}>
+                        <Text style={styles.caveNumber}>Cash out #{index + 1}</Text>
+                        <Text style={styles.caveMontant}>{formatCurrency(decave.montant_restant)}</Text>
+                      </View>
+                      <View style={styles.caveActions}>
+                        <Text style={[
+                          styles.caveTime,
+                          { color: decave.gain_perte >= 0 ? "#10B981" : "#EF4444" }
+                        ]}>
+                          {decave.gain_perte >= 0 ? '+' : ''}{formatCurrency(decave.gain_perte)}
+                        </Text>
                       </View>
                     </View>
                   ))}
@@ -732,12 +771,12 @@ export default function PartieDetailScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* Finish Game Modal */}
+      {/* Decave Modal */}
       <Modal
         animationType="slide"
         transparent={true}
-        visible={finishGameModal}
-        onRequestClose={() => setFinishGameModal(false)}
+        visible={decaveModal}
+        onRequestClose={() => setDecaveModal(false)}
       >
         <KeyboardAvoidingView 
           style={styles.modalOverlay} 
@@ -746,9 +785,9 @@ export default function PartieDetailScreen() {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
-                Finaliser - {selectedParticipant?.joueur.pseudo}
+                Cash out - {selectedParticipant?.joueur.pseudo}
               </Text>
-              <TouchableOpacity onPress={() => setFinishGameModal(false)}>
+              <TouchableOpacity onPress={() => setDecaveModal(false)}>
                 <Ionicons name="close" size={24} color="#6B7280" />
               </TouchableOpacity>
             </View>
@@ -761,17 +800,29 @@ export default function PartieDetailScreen() {
                   {formatCurrency(selectedParticipant?.totalCave || 0)}
                 </Text>
               </View>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Cash out précédent:</Text>
+                <Text style={styles.infoValue}>
+                  {formatCurrency(selectedParticipant?.totalDecave || 0)}
+                </Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Disponible:</Text>
+                <Text style={styles.infoValue}>
+                  {formatCurrency((selectedParticipant?.totalCave || 0) - (selectedParticipant?.totalDecave || 0))}
+                </Text>
+              </View>
             </View>
 
             <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Cash out *</Text>
+              <Text style={styles.inputLabel}>Montant du cash out *</Text>
               <View style={styles.inputWrapper}>
                 <Ionicons name="logo-euro" size={20} color="#6B7280" />
                 <TextInput
                   style={styles.input}
-                  value={montantRestant}
-                  onChangeText={handleChangeMontant}
-                  placeholder="Montant final"
+                  value={cashOutMontant}
+                  onChangeText={handleChangeCashOut}
+                  placeholder="Montant du cash out"
                   placeholderTextColor="#9CA3AF"
                   keyboardType="decimal-pad"
                   returnKeyType="done"
@@ -779,14 +830,14 @@ export default function PartieDetailScreen() {
               </View>
             </View>
 
-            {montantRestant && (
+            {cashOutMontant && (
               <View style={styles.calculResult}>
-                <Text style={styles.calculLabel}>Gain/Perte:</Text>
+                <Text style={styles.calculLabel}>Nouveau total cash out:</Text>
                 <Text style={[
                   styles.calculValue,
-                  { color: parseFloat(montantRestant) - (selectedParticipant?.totalCave || 0) >= 0 ? "#10B981" : "#EF4444" }
+                  { color: "#111827" }
                 ]}>
-                  {formatCurrency(parseFloat(montantRestant) - (selectedParticipant?.totalCave || 0))}
+                  {formatCurrency(parseFloat(cashOutMontant) + (selectedParticipant?.totalDecave || 0))}
                 </Text>
               </View>
             )}
@@ -794,12 +845,12 @@ export default function PartieDetailScreen() {
             <TouchableOpacity
               style={[
                 styles.submitButton,
-                !montantRestant.trim() && styles.submitButtonDisabled,
+                !cashOutMontant.trim() && styles.submitButtonDisabled,
               ]}
-              onPress={handleFinishGame}
-              disabled={!montantRestant.trim()}
+              onPress={handleDecave}
+              disabled={!cashOutMontant.trim()}
             >
-              <Text style={styles.submitButtonText}>Enregistrer le résultat</Text>
+              <Text style={styles.submitButtonText}>Enregistrer le cash out</Text>
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
