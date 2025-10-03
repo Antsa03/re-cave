@@ -91,14 +91,19 @@ export default function PartieDetailScreen() {
   const [selectedPlayer, setSelectedPlayer] = useState<number | null>(null);
   const [selectedParticipant, setSelectedParticipant] = useState<ParticipantData | null>(null);
   const [selectedCave, setSelectedCave] = useState<Cave | null>(null);
-  const [selectedDecave, setSelectedDecave] = useState<Decave | null>(null);
   
   // Form states
   const [caveMontant, setCaveMontant] = useState("");
   const [cashOutMontant, setCashOutMontant] = useState("");
   
   // Montants prédéfinis
-  const predefinedAmounts = [10, 100, 1000, 10000, 20, 200, 2000, 20000, 50, 500, 5000, 50000];
+  const predefinedAmounts = [
+    100, 1000, 2000, 10000,
+    200, 1200, 2500, 20000, 
+    400, 1400, 4000, 40000,
+    500, 1500, 5000, 50000,
+    600, 1600, 6000, 60000,
+    800, 1800, 8000, 80000];
 
   useEffect(() => {
     if (id) {
@@ -116,6 +121,22 @@ export default function PartieDetailScreen() {
     } else if (text === "") {
       setCashOutMontant(""); 
     } else {
+    }
+  };
+
+  const handleChangeRecave = (text: string) => {
+    // Convertir la saisie en nombre
+    const valeur = parseFloat(text);
+  
+    // Vérifie si c'est un nombre valide et inférieur à une limite
+    if(partie?.big_blind){
+      if (!isNaN(valeur) && valeur <= partie?.big_blind * 200) {
+        setCaveMontant(text);
+        
+      } else if (text === "") {
+        setCaveMontant(""); 
+      } else {
+      }
     }
   };
 
@@ -199,9 +220,12 @@ export default function PartieDetailScreen() {
     if (!selectedParticipant || !caveMontant.trim()) return;
     
     const montant = parseFloat(caveMontant);
-    if (isNaN(montant) || montant <= 0) {
-      Alert.alert("Erreur", "Le montant doit être un nombre positif");
-      return;
+    if(partie?.big_blind){
+      if (isNaN(montant) || montant <= 0 || montant > partie?.big_blind * 200 || montant < partie.big_blind * 20) {
+        console.log(montant <= partie.big_blind * 20 ," ", montant >= partie?.big_blind * 200);
+        Alert.alert("Erreur", "Montant autorisé : entre 20 BB et 200 BB.(BB: Big Blind)");
+        return;
+      }
     }
     
     try {
@@ -420,11 +444,11 @@ export default function PartieDetailScreen() {
           <Text style={styles.infoValue}>{participants.length}</Text>
         </View>
         <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>Total recave</Text>
+          <Text style={styles.infoLabel}>Total recave:</Text>
           <Text style={styles.infoValue}>{totalRecave}</Text>
         </View>
         <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>Table stakes</Text>
+          <Text style={styles.infoLabel}>Table stakes:</Text>
           <Text style={styles.infoValue}>{tableStackt}</Text>
         </View>
       </View>
@@ -667,7 +691,7 @@ export default function PartieDetailScreen() {
                 <TextInput
                   style={styles.input}
                   value={caveMontant}
-                  onChangeText={setCaveMontant}
+                  onChangeText={handleChangeRecave}
                   placeholder="Montant"
                   placeholderTextColor="#9CA3AF"
                   keyboardType="decimal-pad"

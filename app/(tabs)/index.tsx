@@ -102,7 +102,7 @@ export default function HomeScreen() {
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <Text style={styles.headerTitle}>Re Cave</Text>
-          <Text style={styles.headerSubtitle}>Gestion de parties de poker par G++</Text>
+          <Text style={styles.headerSubtitle}>Gestion de cave poker</Text>
         </View>
         <View style={styles.headerRight}>
           <TouchableOpacity
