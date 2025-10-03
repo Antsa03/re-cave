@@ -4,7 +4,7 @@
     "slug": "cave-ray",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/poker-chip.png",
+    "icon": "./assets/recave-by-gpp.jpg",
     "scheme": "caveray",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -14,9 +14,9 @@
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/poker-chip.png",
-        "backgroundImage": "./assets/poker-chip.png",
-        "monochromeImage": "./assets/poker-chip.png"
+        "foregroundImage": "./assets/recave-by-gpp.jpg",
+        "backgroundImage": "./assets/recave-by-gpp.jpg",
+        "monochromeImage": "./assets/recave-by-gpp.jpg"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
@@ -24,14 +24,14 @@
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/recave-by-gpp.jpg"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "image": "./assets/poker-chip.png",
+          "image": "./assets/recave-by-gpp.jpg",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",

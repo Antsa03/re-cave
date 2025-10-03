@@ -234,13 +234,6 @@ export default function PartieDetailScreen() {
       return;
     }
     
-    // Vérifier que le montant ne dépasse pas le total des caves moins les décaves déjà effectués
-    const montantDisponible = selectedParticipant.totalCave - selectedParticipant.totalDecave;
-    if (montant > montantDisponible) {
-      Alert.alert("Erreur", `Le montant ne peut pas dépasser ${formatCurrency(montantDisponible)}`);
-      return;
-    }
-    
     try {
       // Créer le résultat (décave)
       const gainPerte = montant - selectedParticipant.totalCave + selectedParticipant.totalDecave;
@@ -478,13 +471,13 @@ export default function PartieDetailScreen() {
                       setDecaveModal(true);
                     }}
                   >
-                    <Ionicons name="remove-circle-outline" size={20} color="#F59E0B" />
+                    <Ionicons name="checkmark-circle" size={20} color="#10B981" />
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.actionButton}
                     onPress={() => handleRemoveParticipant(participant)}
                   >
-                    <Ionicons name="trash-outline" size={20} color="#EF4444" />
+                    <Ionicons name="remove-circle" size={20} color="#EF4444" />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -809,7 +802,7 @@ export default function PartieDetailScreen() {
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>Disponible:</Text>
                 <Text style={styles.infoValue}>
-                  {formatCurrency((selectedParticipant?.totalCave || 0) - (selectedParticipant?.totalDecave || 0))}
+                  {tableStackt}
                 </Text>
               </View>
             </View>
